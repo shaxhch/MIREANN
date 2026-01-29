@@ -1,0 +1,44 @@
+#cell   #DONNOT DELETE THE ANNOTATED LINES IN THIS INPUT FILE  
+  30.0   0.0   0.0   
+   0.0  30.0   0.0   
+   0.0   0.0  30.0
+#pbc
+1  1  1 
+#numatoms
+26
+#atom species
+F   12.017
+C   12.017
+H    1.007
+H    1.007
+O   15.999
+H    1.007
+O   15.999
+C   12.017
+C   12.017
+H    1.007
+H    1.007
+H    1.007
+O   15.999
+C   12.017
+C   12.017
+C   12.017
+O   15.999
+O   15.999
+C   12.017
+H    1.007
+C   12.017
+H    1.007
+C   12.017
+H    1.007
+C   12.017
+H    1.007
+#maxtype
+4
+#type species
+F
+C
+O
+H
+#maxnum_MM
+9000
