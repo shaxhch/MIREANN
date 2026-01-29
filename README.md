@@ -11,7 +11,7 @@ B: for REANN
    　　Line 2-4: Lattice vector defining the unit cell of the system  
    　　Line 5: Enable(1)/disable(0) the periodic boundary conditions in each direction  
    　　Line 6-N+5: Atomic name, relative atomic mass, cooridinates, atomic force vectors  
-   　　Line N+6-Last Line: Start with "abprop:" and then follow by the target property  
+   　　Last Line: Start with "abprop:" and then follow by the target property  
    B.2 Parameters in "input_nn" and "input_density" file  
    　　Details can be referred in "code/reann_core/manual/REANNPackage_manumal_v_2_0.pdf"  
    B.3 Construct the model  
