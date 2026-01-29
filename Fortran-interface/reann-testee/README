@@ -1,0 +1,7 @@
+1. this code is used with fixed cell
+
+2. softwre requirements:
+   CMake              3.19.3
+   libtorch-CPU/GPU   1.12.1
+   CUDA               11.3
+   gcc/g++/gfortran   9.2.0
