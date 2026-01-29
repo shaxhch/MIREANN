@@ -1,0 +1,30 @@
+ dynamic of Aspirin
+ &cntrl
+  imin   = 0,
+  irest=1,
+  ntx=5,
+  ntb    = 1,
+  cut    = 12,
+  ntc=1,
+  ntf=1,
+  tempi=300.0,
+  temp0=300.0,
+  ntt=1,
+  nstlim=50000,dt=0.001
+  ntpr=1,ntwx=100,ntwr=100
+  NTR=0,
+  iwrap=1,
+ /
+&qchem_nml
+fixqm = 0
+qmcharge=-1
+qmcut = 25.0d0
+rcterm =1 
+rcfile = 'RC.in'
+qm_force_file = 'force.out'
+qmmask = '@778,781-785,1868,1888-1915,1966-1971,2584,2586-2591,3035,3037-3047,17175-17177'
+zeromask = '@776,777,779,780,786-789,802,803,1866,1867,1869-1872,1916-1920,1972-1975,1984,1985,2582,2583,2585,2592,2593,3033,3034,3036,3048,3049'
+qmcutmode= 1
+qmcenter = 17175
+/
+
