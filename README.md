@@ -8,10 +8,10 @@ A: Prepare the environment
 B: for REANN  
    B.1 Prepare the "configuration" in the folder "train/" and "test", example input includes:  
    　　Line 1: Comment line  
-   　　Line 2~4: Lattice vector defining the unit cell of the system  
+   　　Line 2-4: Lattice vector defining the unit cell of the system  
    　　Line 5: Enable(1)/disable(0) the periodic boundary conditions in each direction  
-   　　Line 6~N+5: Atomic name, relative atomic mass, cooridinates, atomic force vectors  
-   　　Line N+6: Start with "abprop:" and then follow by the target property  
+   　　Line 6-N+5: Atomic name, relative atomic mass, cooridinates, atomic force vectors  
+   　　Line N+6-Last Line: Start with "abprop:" and then follow by the target property  
    B.2 Parameters in "input_nn" and "input_density" file  
    　　Details can be referred in "code/reann_core/manual/REANNPackage_manumal_v_2_0.pdf"  
    B.3 Construct the model  
@@ -19,26 +19,26 @@ B: for REANN
 C: for MIREANN  
    C.1 Prepare the "configuration" in the folder "train/" and "test", example input includes:  
    　　Line 1: Comment line  
-   　　Line 2~4: Lattice vector defining the unit cell of the system  
+   　　Line 2-4: Lattice vector defining the unit cell of the system  
    　　Line 5: Enable(1)/disable(0) the periodic boundary conditions in each direction  
-   　　Line 6~N+5: Atomic name, relative atomic mass, cooridinates, atomic force vectors  
+   　　Line 6-N+5: Atomic name, relative atomic mass, cooridinates, atomic force vectors  
    　　Line N+6: Indicate the background charges part with "background:"  
-   　　Line N+6~-2:coordinates of MM atoms, background charges (0 for the case in vacuo), electrostatic potential, charges in computing electrostatic energy  
+   　　Line N+6-Last Line: coordinates of MM atoms, background charges (0 for the case in vacuo), electrostatic potential, charges in computing electrostatic energy  
    　　Last line: the contributed electrostatic energy calculated from $$\sum_{i=1}^{N_{MM}}q_iV_i$$  
    C.2 Parameters in "input_nn" and "input_density" file  
    　　start_table = 7 to train the electrostatic potential    
    C.3 Construct the model  
    　　Start to train the model with the command like "torchrun --nnodes=1 --nproc_per_node=1 --master_port=4161 $MIEANN_CORE_DIR"  
 3. Building an Interface for the Amber Program  
-   　　Because Amber is commercial software, the modification of its codes in our scheme are not available unless reasonable request. Here, we only offer its external interface with MIREANN. To build the interface for the Amber program, user needs to build a dynamic-link library to link the JIT inference model of Pytorch trained by MIREANN to the main program sander in Amber, which is written in Fortran. The interface spans four programming languages: PyTorch, C++, C, and Fortran, which is realized via Cmake program.
+   　　Because Amber is commercial software, the modification of its codes in our scheme are not available unless reasonable request. Here, we only offer its external interface with MIREANN. To build the interface for the Amber program, user needs to build a dynamic-link library to link the JIT inference model of Pytorch trained by MIREANN to the main program sander in Amber, which is written in Fortran. The interface spans four programming languages: PyTorch, C++, C, and Fortran, which is realized via Cmake program.  
    　　The original copy for inferring energy is available at the website https://github.com/junfanxia/proj-reann-cpp2fortran-fixedcell.  
    　　The compilation is relatively complicated and user needs to follow these steps strictly:  
    1.Prepare the environment  
    　　Here are the software requirements:  
-   　　　　CMake                          3.19.3  
-   　　　　libtorch-CPU/GPU               1.12.1  
-   　　　　gcc/g++/gfortran               8.5.0  
-   　　　　CUDA(only for GPU)             11.3  
+   　　　　CMake　　　　　　　　　　　　　　　　 3.19.3  
+   　　　　libtorch-CPU/GPU　　　　　　　　　　1.12.1  
+   　　　　gcc/g++/gfortran　　　　　　　　　　8.5.0  
+   　　　　CUDA(only for GPU)　　　　　　　　　　11.3  
    2.Compiling and Linking  
    　　User needs to change the path of compilers in “build/build.sh” and the path of libtorch in “src/CmakeLists.txt” and “src/interfaces/CmakeLists.txt”. Then, execute Linux commands in the root directory of the interface:  
    　　cd build; sh build.sh; make  
