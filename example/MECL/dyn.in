@@ -1,0 +1,29 @@
+ dynamic of CH3Cl and Cl-
+ &cntrl
+  imin   = 0,
+  irest=1,
+  ntx=5,
+  ntb    = 1,
+  cut    = 12,
+  ntc=1,
+  ntf=1,
+  tempi=300.0,
+  temp0=300.0,
+  ntt=1,
+  nstlim=50000,dt=0.001
+  ntpr=1,ntwx=100,ntwr=100
+  NTR=0,
+  iwrap=1,
+ /
+&qchem_nml
+fixqm = 0
+qmcharge = -1
+qmcut = 20.0d0
+rcterm = 1 
+rcfile = 'RC.in'
+qm_force_file = 'force.out'
+qmmask = '@1-6'
+qmcutmode = 1
+qmcenter = 2
+/
+

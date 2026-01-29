@@ -1,0 +1,23 @@
+#cell   #DONNOT DELETE THE ANNOTATED LINES IN THIS INPUT FILE                                                                                                
+  30.0   0.0   0.0
+   0.0  30.0   0.0
+   0.0   0.0  30.0
+#pbc
+0  0  0 
+#numatoms
+6
+#atom species
+Cl  35.500  
+Cl  35.500  
+C   12.017  
+H    1.007  
+H    1.007  
+H    1.007  
+#maxtype
+3
+#type species
+Cl
+C
+H
+#maxnum_MM
+5500
