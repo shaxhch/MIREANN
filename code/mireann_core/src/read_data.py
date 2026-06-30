@@ -67,8 +67,9 @@ def Read_data(folderlist,nprob,start_table=None):
                             abprop[num].append(tmp[4])
                             bgcharge_real[num].append(tmp[5])
                     if m[0]=="abprop:":
-                        force.append(float(m[1]))
-                        break
+                         force.append(float(m[1]))
+                         break
+
                     if start_table==1:
                         atom[num].append(m[0]) 
                         tmp=list(map(float,m[1:]))

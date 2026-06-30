@@ -97,7 +97,7 @@ class ChPES(torch.nn.Module):
         if 'dceff' in locals().keys():
             dceff=torch.from_numpy(np.array(dceff))
         else:
-            dceff=torch.ones(nwave)
+            dceff=torch.ones(maxnumtype,nwave)
 
         if 'polarizability' in locals().keys():
             polarizability=torch.from_numpy(np.array(polarizability))
@@ -153,7 +153,7 @@ class ChPES(torch.nn.Module):
         #ME part
         density0 = self.density(cart,torch.zeros((1, 3), dtype=bgcart.dtype, device=bgcart.device), 
                                 torch.zeros((1,), dtype=bgcha.dtype, device=bgcha.device), neigh_list, shifts, species)
-        electronegativities0 = self.nnmod(density0, species)
+        electronegativities0 = -self.nnmod(density0, species)
         electronegativities0 = torch.nn.functional.pad(electronegativities0, (0, 0, 0, 1), value=self.totcharge)
         charge0 = torch.matmul(torch.linalg.inv(Amatrix), electronegativities0.squeeze(-1))
         
@@ -162,15 +162,16 @@ class ChPES(torch.nn.Module):
 
         #EE part
         density = self.density(cart, bgcart, bgcha, neigh_list, shifts, species)
-        electronegativities = self.nnmod(density, species)
+        electronegativities = -self.nnmod(density, species)
         
         electronegativities = torch.nn.functional.pad(electronegativities, (0, 0, 0, 1), value=self.totcharge)
         charge = torch.matmul(torch.linalg.inv(Amatrix), electronegativities.squeeze(-1))
         
         charge_qm = charge[:-1]
         energy = torch.sum(charge_qm.unsqueeze(-1)*(1/distances_qm_bg-torch.exp(-distances_qm_bg/self.polarizability[species_].unsqueeze(-1))*(1/distances_qm_bg+0.5/self.polarizability[species_].unsqueeze(-1))) * bgcha)*18.2223**2
-        
+
         energy = (energy+energy0)/2
+
 
         grad_outputs: List[Optional[torch.Tensor]] = [torch.ones_like(energy)]
         gradients = torch.autograd.grad(

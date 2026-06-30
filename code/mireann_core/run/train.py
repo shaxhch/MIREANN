@@ -56,6 +56,7 @@ elif start_table==6:
     import qeq.script_PES as PES_Normal
 elif start_table==7:
     import ee.script_PES as PES_Normal
+fout.write(time.strftime("%Y-%m-%d-%H_%M_%S \n", time.localtime()))
 #==============================train data loader===================================
 # 对数据的加载，包括
 # com_coor:坐标 abpropset:ab物理量 numatoms:原子数量 species:原子种类

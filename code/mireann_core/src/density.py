@@ -11,6 +11,7 @@ class GetDensity(torch.nn.Module):
         '''
         rs: tensor[ntype,nwave] float
         inta: tensor[ntype,nwave] float
+        dceff: tensor[ntype, nwave] float
         nipsin: np.array/list   int
         cutoff: float
         '''
@@ -78,7 +79,10 @@ class GetDensity(torch.nn.Module):
         totnatom=cart_.shape[0]
         bg_field = self.calculate_bg_field(cart,bgcart,bgcha)
         angular_output = self.angular(bg_field,torch.ones(bg_field.shape[0],dtype=bg_field.dtype,device=bg_field.device))
-        bg_orbital = oe.contract("ji,k->ijk",angular_output,self.dceff,backend="torch").contiguous()
+        mask = species >= 0
+        dceff_per_atom = torch.zeros((species.shape[0], self.dceff.shape[1]),dtype=self.dceff.dtype,device=self.dceff.device)
+        dceff_per_atom[mask] = self.dceff.index_select(0,species[mask])
+        bg_orbital = oe.contract("ji,ik->jik",angular_output,dceff_per_atom,backend="torch").permute(1,0,2).contiguous()
         tmp_index=torch.arange(numatoms.shape[0],device=cart.device)*cart.shape[1]
         self_mol_index=tmp_index.view(-1,1).expand(-1,atom_index.shape[2]).reshape(1,-1)
         padding_mask=torch.nonzero((shifts.view(-1,3)>-1e10).all(1)).view(-1)

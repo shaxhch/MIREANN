@@ -1,0 +1,982 @@
+9c9
+<         self.silu=nn.SiLU()
+---
+>         self.silu=nn.SiLU(inplace=False)
+3,14c3,10
+< def get_com(coor, force, bgcor, mass, scalmatrix, numatoms, maxnumatom, table_coor, start_table):
+<     ntotpoint = len(coor)
+<     maxnumforce = maxnumatom * 3
+<     order_force = None
+<     com_bgcor = None
+<     com_coor = np.zeros((ntotpoint, maxnumatom, 3), dtype=scalmatrix.dtype)
+<     fcoor = np.zeros((maxnumatom, 3), dtype=scalmatrix.dtype)
+<     if start_table == 7:
+<         maxnumbg = max(len(point) for point in bgcor)
+<         com_bgcor = np.zeros((ntotpoint, maxnumbg,3), dtype=scalmatrix.dtype)
+<     if start_table == 1:
+<         order_force = np.zeros((ntotpoint, maxnumforce), dtype=scalmatrix.dtype)
+---
+> def get_com(coor,force,mass,scalmatrix,numatoms,maxnumatom,table_coor,start_table):
+>     # shift the com of coordinate of molecule to the origin for warranting the transitional invariance used for DM and polarizability
+>     ntotpoint=len(coor) 
+>     maxnumforce=maxnumatom*3
+>     order_force=None
+>     com_coor=np.zeros((ntotpoint,maxnumatom,3),dtype=scalmatrix.dtype)
+>     fcoor=np.zeros((maxnumatom,3),dtype=scalmatrix.dtype)
+>     if start_table==1: order_force=np.zeros((ntotpoint,maxnumforce),dtype=scalmatrix.dtype)
+16,37c12,22
+<         tmpmass = np.array(mass[ipoint], dtype=scalmatrix.dtype)
+<         natom = numatoms[ipoint]
+<         matrix = np.linalg.inv(scalmatrix[ipoint])
+<         fcoor[0:natom] = coor[ipoint]
+<         
+<         if start_table == 1:
+<             order_force[ipoint, 0:natom*3] = np.array(force[ipoint], dtype=scalmatrix.dtype).reshape(-1)
+<         
+<         if table_coor == 0:
+<             fcoor[0:natom] = np.matmul(fcoor[0:natom], matrix)
+<         
+<         inv_coor = np.round(fcoor[0:natom] - fcoor[0])
+<         fcoor[0:natom] -= inv_coor
+<         fcoor[0:natom] = np.matmul(fcoor[0:natom], scalmatrix[ipoint, :, :])
+<         com = np.matmul(tmpmass, fcoor[0:natom, :]) / np.sum(tmpmass)
+<         com_coor[ipoint, 0:natom] = fcoor[0:natom] - com
+<         
+<         if start_table == 7:
+<             numbg = len(bgcor[ipoint])
+<             bg_fcoor=bgcor[ipoint]
+<             com_bgcor[ipoint,0:numbg]=bg_fcoor-com
+<     return com_coor, order_force, com_bgcor
+---
+>         tmpmass=np.array(mass[ipoint],dtype=scalmatrix.dtype)
+>         matrix=np.linalg.inv(scalmatrix[ipoint])
+>         fcoor[0:numatoms[ipoint]]=coor[ipoint]
+>         if start_table==1: order_force[ipoint,0:numatoms[ipoint]*3]=np.array(force[ipoint],dtype=scalmatrix.dtype).reshape(-1)
+>         if table_coor==0: fcoor[0:numatoms[ipoint]]=np.matmul(fcoor[0:numatoms[ipoint]],matrix)
+>         inv_coor=np.round(fcoor[0:numatoms[ipoint]]-fcoor[0])
+>         fcoor[0:numatoms[ipoint]]-=inv_coor
+>         fcoor[0:numatoms[ipoint]]=np.matmul(fcoor[0:numatoms[ipoint]],scalmatrix[ipoint,:,:])
+>         com=np.matmul(tmpmass,fcoor[0:numatoms[ipoint],:])/np.sum(tmpmass)
+>         com_coor[ipoint,0:numatoms[ipoint]]=fcoor[0:numatoms[ipoint]]-com
+>     return com_coor,order_force 
+6c6
+<     def __init__(self,image,bgcor,bgcha,bgcha_real,label,numatoms,index_ele,atom_index,shifts,batchsize,min_data_len=None,shuffle=True):
+---
+>     def __init__(self,image,ef,label,numatoms,index_ele,atom_index,shifts,batchsize,min_data_len=None,shuffle=True):
+8,10c8
+<         self.bgcor=bgcor
+<         self.bgcha=bgcha
+<         self.bgcha_real=bgcha_real
+---
+>         self.ef=ef
+38,44c36
+<             bgcharge=None
+<             bgcharge_real=None
+<             bgcoordinates=None
+<             if self.bgcha is not None:
+<                 bgcharge=self.bgcha.index_select(0,index_batch)
+<                 bgcharge_real=self.bgcha_real.index_select(0,index_batch)
+<                 bgcoordinates=self.bgcor.index_select(0,index_batch)
+---
+>             ef=self.ef.index_select(0,index_batch)
+51,52c43
+<             #print(dist.get_rank(),self.ipoint,self.batchsize)
+<             return abprop,coordinates,bgcoordinates,bgcharge,bgcharge_real,numatoms,species,atom_index,shifts
+---
+>             return abprop,coordinates,ef,numatoms,species,atom_index,shifts
+9c9
+<     def __init__(self,rs,inta,dceff,cutoff,neigh_atoms,nipsin,norbit,ocmod_list):
+---
+>     def __init__(self,rs,inta,cutoff,neigh_atoms,nipsin,norbit,ocmod_list):
+14d13
+<         dceff: tensor[ntype, nwave] float
+20,22c19,20
+<         self.dceff=nn.parameter.Parameter(dceff)
+<         self.register_buffer('cutoff',torch.Tensor([cutoff]))
+<         self.register_buffer('nipsin',torch.tensor([nipsin]))
+---
+>         self.register_buffer('cutoff', torch.Tensor([cutoff]))
+>         self.register_buffer('nipsin', torch.tensor([nipsin]))
+32a31
+>         self.ef_para=nn.parameter.Parameter(torch.ones(self.rs.shape[1]))
+39,44d37
+<     def calculate_bg_field(self, cart, bgcart, bgcha):
+<         delta = cart.unsqueeze(2)-bgcart.unsqueeze(1)
+<         distance = torch.norm(delta,  dim=-1, keepdim=True)+1e-7
+<         bg_field = torch.sum(bgcha.unsqueeze(1).unsqueeze(-1)*delta/distance.pow(3),dim=2)
+<         return bg_field.view(-1,  3)
+< 
+56c49
+<         # return cutoff_cosine[neighbour*numatom*nbatch]
+---
+>         # return cutoff_cos[neighbour*numatom*nbatch]
+58c51
+< 
+---
+>     
+70c63
+<     def forward(self,cart,bgcart,bgcha,numatoms,species,atom_index,shifts):
+---
+>     def forward(self,cart,ef,numatoms,species,atom_index,shifts):
+80,83c73,76
+<         bg_field = self.calculate_bg_field(cart,bgcart,bgcha)
+<         angular_output = self.angular(bg_field,torch.ones(bg_field.shape[0],dtype=bg_field.dtype,device=bg_field.device))
+<         dceff_per_atom = self.dceff.index_select(0, species)
+<         bg_orbital = oe.contract("ji,ik->jik", angular_output, dceff_per_atom, backend="torch").permute(1,0,2).contiguous()
+---
+>         # consider the effect of the external field
+>         ef_orbital = oe.contract("ji,k ->ijk",self.angular(ef,torch.ones(ef.shape[0],dtype=ef.dtype,device=ef.device)),\
+>         self.ef_para,backend="torch").contiguous().unsqueeze(1).expand(-1,cart.shape[1],-1,-1).reshape(totnatom,-1,self.rs.shape[1])
+>         #============================================================================
+88c81
+<         atom_index12=(atom_index.view(2,-1)+self_mol_index)[:,padding_mask]
+---
+>         atom_index12=(atom_index.view(2,-1)+self_mol_index)[:,padding_mask].contiguous()
+92a86
+>         dist_vec=dist_vec/distances.view(-1,1)
+101c95
+<         density,worbital=self.obtain_orb_coeff(0,totnatom,orbital,bg_orbital,atom_index12,orb_coeff,hyper)
+---
+>         density,worbital=self.obtain_orb_coeff(0,totnatom,orbital,ef_orbital,atom_index12,orb_coeff,hyper)
+105c99
+<             density,worbital = self.obtain_orb_coeff(ioc_loop+1,totnatom,orbital,bg_orbital,atom_index12,orb_coeff,hyper)
+---
+>             density,worbital = self.obtain_orb_coeff(ioc_loop+1,totnatom,orbital,ef_orbital,atom_index12,orb_coeff,hyper)
+108c102
+<     def obtain_orb_coeff(self,iteration:int,totnatom:int,orbital,bg_orbital,atom_index12,orb_coeff,hyper):
+---
+>     def obtain_orb_coeff(self,iteration:int,totnatom:int,orbital,ef_orbital,atom_index12,orb_coeff,hyper):
+111,114c105,109
+<         bg_orbital=torch.index_add(bg_orbital,0,atom_index12[0],worbital)
+<         hyper_worbital=oe.contract("ijk,jkm -> ijm",bg_orbital,hyper,backend="torch").contiguous()
+<         density=torch.sum(torch.square(hyper_worbital),dim=1)
+<         return density,bg_orbital
+---
+>         ef_orbital=torch.index_add(ef_orbital,0,atom_index12[0],worbital)
+>         hyper_worbital=oe.contract("ijk,jkm -> ijm",ef_orbital,hyper,backend="torch").contiguous()
+>         density=torch.sum(torch.square(hyper_worbital),dim=1)       
+>         return density,ef_orbital
+> 
+13d12
+<     #如果scalmatrix,species,period相同，并且未达到batchsize上限，则将它们划到同一个batch中
+7c7
+< def get_info_of_rank(range_rank,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,bgcor,bgcharge,bgcharge_real,\
+---
+> def get_info_of_rank(range_rank,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,\
+16,24c16
+<     bgcor_rank=None
+<     bgcharge_rank=None
+<     bgcharge_real_rank=None
+<     if start_table==1: 
+<         force_rank=force[range_rank[0]:range_rank[1]]
+<     if start_table==7: 
+<         bgcor_rank=bgcor[range_rank[0]:range_rank[1]]
+<         bgcharge_rank=bgcharge[range_rank[0]:range_rank[1]]
+<         bgcharge_real_rank=bgcharge_real[range_rank[0]:range_rank[1]]
+---
+>     if start_table==1: force_rank=force[range_rank[0]:range_rank[1]]
+34,55c26,27
+<     com_coor_rank,order_force_rank,com_bgcor_rank=get_com(coor_rank,force_rank,bgcor_rank,mass_rank,cell_rank,numatoms_rank,maxnumatom,table_coor,start_table)
+<     if start_table==1: 
+<         order_force_rank=torch.from_numpy(order_force_rank)
+<     if start_table==7:
+<         com_bgcor_rank=torch.from_numpy(com_bgcor_rank)
+<         max_bg = com_bgcor_rank.shape[1]
+<         bgcharge_padded = []
+<         bgcharge_real_padded = []
+<         for charges in bgcharge_rank:
+<             padded = np.zeros(max_bg, dtype=cell_rank.dtype)
+<             n_charges = len(charges)
+<             padded[:n_charges] = charges[:n_charges]
+<             bgcharge_padded.append(padded)
+<         for charges_real in bgcharge_real_rank:
+<             padded_real = np.zeros(max_bg, dtype=cell_rank.dtype)
+<             n_charges_real = len(charges_real)
+<             padded_real[:n_charges_real] = charges_real[:n_charges_real]
+<             bgcharge_real_padded.append(padded_real)
+<         bgcharge_rank = np.array(bgcharge_padded, dtype=cell_rank.dtype)
+<         bgcharge_rank = torch.from_numpy(bgcharge_rank)
+<         bgcharge_real_rank = np.array(bgcharge_real_padded, dtype=cell_rank.dtype)
+<         bgcharge_real_rank = torch.from_numpy(bgcharge_real_rank)
+---
+>     com_coor_rank,order_force_rank=get_com(coor_rank,force_rank,mass_rank,cell_rank,numatoms_rank,maxnumatom,table_coor,start_table)
+>     if start_table==1: order_force_rank=torch.from_numpy(order_force_rank)
+61c33
+<     return com_coor_rank,order_force_rank,com_bgcor_rank,bgcharge_rank,bgcharge_real_rank,numatoms_rank,species_rank,atom_index_rank,shifts_rank
+---
+>     return com_coor_rank,order_force_rank,numatoms_rank,species_rank,atom_index_rank,shifts_rank
+32d31
+<     # torch.cartesian_prod，对给定的张量序列进行笛卡尔积
+47c46,47
+<     distances = (selected_coordinates[:, 0, ...] - selected_coordinates[:, 1, ...] + shifts_all).norm(2, -1)
+---
+>     distances = (selected_coordinates[:, 0, ...] - selected_coordinates[:, 1, ...] + shifts_all).\
+>     norm(2, -1)
+50c50
+<     atom_index=torch.zeros((2,num_mols,num_atoms*neigh_atoms),device=cell.device,dtype=torch.long)
+---
+>     atom_index=torch.zeros((2,num_mols,num_atoms*neigh_atoms),device=cell.device,dtype=torch.int32)
+54c54,55
+<         pair_index = torch.nonzero(((distances[inum_mols] <= cutoff)*(distances[inum_mols]>0.01))).reshape(-1)
+---
+>         pair_index = torch.nonzero(((distances[inum_mols] <= cutoff)*(distances[inum_mols]>0.01))).\
+>         reshape(-1)
+4d3
+<     os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >gpu_info')
+12,13c11,12
+<        os.environ['CUDA_VISIBLE_DEVICES']=str_queue
+<     os.system('rm gpu_info')
+---
+>        os.environ['CUDA_VISIBLE_DEVICES']=str_queue[0:-2]
+>        print(os.environ.get('CUDA_VISIBLE_DEVICES'))
+6c6
+< from torch.nn.init import xavier_uniform_,zeros_,constant_
+---
+> from torch.nn.init import xavier_normal_,zeros_,constant_
+25c25
+<                 xavier_uniform_(linear.weight)
+---
+>                 xavier_normal_(linear.weight)
+54c54
+<               xavier_uniform_(linear.weight)
+---
+>               xavier_normal_(linear.weight)
+74c74
+<               ele_den = density[ele_index]
+---
+>               ele_den = density[ele_index].contiguous()
+6,102c6,54
+< 
+< def Optimize(fout,prop_ceff,nprop,train_nele,test_nele,init_f,final_f,decay_factor,start_lr,end_lr,print_epoch,Epoch,\
+< data_train,data_test,Prop_class,loss_fn,optim,scheduler,ema,restart,PES_Normal,device,isFreezeDensity=False,PES_Lammps=None): 
+< 
+<     rank=dist.get_rank()
+<     best_loss=1e30*torch.ones(1,device=device)
+< 
+<     for iepoch in range(Epoch): 
+<        # set the model to train
+<        Prop_class.train()
+<        lossprop=torch.zeros(nprop,device=device) 
+<        for data in data_train:
+<           abProp,cart,bgcart,bgcha,bgcha_real,numatoms,species,atom_index,shifts=data
+<           loss=loss_fn(Prop_class(cart,bgcart,bgcha,bgcha_real,numatoms,species,atom_index,shifts),abProp)
+<           lossprop+=loss.detach()
+<           loss=torch.sum(torch.mul(loss,prop_ceff[0:nprop]))
+<           # clear the gradients of param
+<           #optim.zero_grad()
+<           optim.zero_grad(set_to_none=True)
+<           #print(torch.cuda.memory_allocated)
+<           # obtain the gradients
+<           loss.backward()
+< 
+<           # <<<<< start froze density >>>>>
+< #          if isFreezeDensity:
+< #              for name, param in Prop_class.named_parameters():
+< #                  if not name.startswith('polarizability') and not name.startswith('density.dceff'):
+< #                    param.grad = None
+<           # <<<<< end froze density >>>>>
+< 
+<           optim.step()   
+< 
+<           #doing the exponential moving average update the EMA parameters
+<           ema.update()
+<     
+<        #  print the error of vailadation and test each print_epoch
+<        if np.mod(iepoch,print_epoch)==0:
+<           # apply the EMA parameters to evaluate
+<           ema.apply_shadow()
+<           # set the model to eval for used in the model
+<           Prop_class.eval()
+<           # all_reduce the rmse form the training process 
+<           # here we dont need to recalculate the training error for saving the computation
+<           dist.all_reduce(lossprop,op=dist.ReduceOp.SUM)
+<           loss=torch.sum(lossprop)
+<           
+<           # get the current rank and print the error in rank 0
+<           if rank==0:
+<               lossprop=torch.sqrt(lossprop.detach().cpu()/train_nele)
+<               lr=optim.param_groups[0]["lr"]
+<               fout.write("{:5} {:4} {:15} {:5e}  {} ".format("Epoch=",iepoch,"learning rate",lr,"train error:"))
+<               for error in lossprop:
+<                   fout.write('{:10.5f} '.format(error))
+<           
+<           # calculate the test error
+<           lossprop=torch.zeros(nprop,device=device)
+<           for data in data_test:
+<              abProp,cart,bgcart,bgcha,bgcha_real,numatoms,species,atom_index,shifts=data
+<              loss=loss_fn(Prop_class(cart,bgcart,bgcha,bgcha_real,numatoms,species,atom_index,shifts,\
+<              create_graph=False),abProp)
+<              lossprop=lossprop+loss.detach()
+< 
+<           # all_reduce the rmse
+<           dist.all_reduce(lossprop,op=dist.ReduceOp.SUM)
+<           loss=torch.sum(torch.mul(loss,prop_ceff[0:nprop]))
+<           scheduler.step(loss)
+<           lr=optim.param_groups[0]["lr"]
+<           f_ceff=init_f+(final_f-init_f)*(lr-start_lr)/(end_lr-start_lr+1e-8)
+<           prop_ceff[1]=f_ceff
+<           #  save the best model
+<           if loss<best_loss[0]:
+<              best_loss[0]=loss
+<              if rank == 0:
+<                  state = {'reannparam': Prop_class.state_dict(), 'optimizer': optim.state_dict()}
+<                  torch.save(state, "./REANN.pth")
+<                  #print(torch.load("REANN.pth",map_location='cpu'))
+<                  PES_Normal.jit_pes()
+<                  if PES_Lammps:
+<                      PES_Lammps.jit_pes()
+<           
+<           # restore the model for continue training
+<           ema.restore()
+<           # back to the best error
+<           if loss>25*best_loss[0] or loss.isnan():
+<               restart(Prop_class,"REANN.pth")
+<               optim.param_groups[0]["lr"]=optim.param_groups[0]["lr"]*decay_factor
+< 
+<           if rank==0:
+<               lossprop=torch.sqrt(lossprop.detach().cpu()/test_nele)
+<               fout.write('{} '.format("test error:"))
+<               for error in lossprop:
+<                  fout.write('{:10.5f} '.format(error))
+<               # if stop criterion
+<               fout.write("\n")
+<               fout.flush()
+<           if lr <=end_lr: break
+< 
+---
+> def Optimize(Epoch,print_epoch,ema_nbatch,weight_scheduler,scheduler,print_info,data_train,data_val,get_loss,swa_model,optim): 
+>      rank=dist.get_rank()
+>      lr=optim.param_groups[0]["lr"]
+>      intime_weight=weight_scheduler(lr)
+>      device=intime_weight.device
+>      nprop=len(intime_weight)
+>      for iepoch in range(Epoch): 
+>          # set the model to train
+>          get_loss.Prop[0].train()
+>          loss_train=torch.zeros(nprop,device=device)        
+>          num=0
+>          for data in data_train:
+>              loss=get_loss(data)
+>              loss_train+=loss.detach()
+>              loss=torch.dot(loss,intime_weight)
+>              # clear the gradients of param
+>              #optim.zero_grad()
+>              optim.zero_grad(set_to_none=True)
+>              # print(torch.cuda.memory_allocated)
+>              # obtain the gradients
+>              loss.backward()
+>              optim.step()   
+>              #update the EMA model
+>              if np.mod(num,ema_nbatch)==0: swa_model.update_parameters(scheduler.model)
+>              num+=1
+> 
+>          #  print the error of vailadation and  each print_epoch
+>          if np.mod(iepoch,print_epoch)==0:
+>              # set the model to eval for used in the model
+>              # all_reduce the rmse form the training process 
+>              # here we dont need to recalculate the training error for saving the computation
+>              dist.reduce(loss_train,0,op=dist.ReduceOp.SUM)
+>              # calculate the val error
+>              get_loss.Prop[0].eval()
+>              loss_val=torch.zeros(nprop,device=device)
+>              for data in data_val:
+>                 loss=get_loss(data,create_graph=False)
+>                 loss_val+=loss.detach()
+> 
+>              # all_reduce the rmse
+>              dist.all_reduce(loss_val.detach(),op=dist.ReduceOp.SUM)
+>              if rank==0: print_info(iepoch,lr,loss_train,loss_val)
+>              loss_scheduler=torch.dot(loss_val,intime_weight)
+>              # stop criterion before the scheduler
+>              if lr<=scheduler.end_lr:
+>                  break
+>              else:
+>                  lr=scheduler(lr,loss_scheduler)
+>                  intime_weight=weight_scheduler(lr)
+Binary files __pycache__/activate.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/activate.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: activate.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: activate.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: checkpoint.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: checkpoint.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: checkpoint.cpython-39.pyc
+Binary files __pycache__/com.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/com.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: com.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: com.cpython-39.pyc
+Binary files __pycache__/cpu_gpu.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/cpu_gpu.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: cpu_gpu.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: cpu_gpu.cpython-39.pyc
+Binary files __pycache__/dataloader.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/dataloader.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: dataloader.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: dataloader.cpython-39.pyc
+Binary files __pycache__/density.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/density.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: density.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: density.cpython-39.pyc
+Only in __pycache__: EMA.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: EMA.cpython-39.pyc
+Binary files __pycache__/get_batchneigh.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/get_batchneigh.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_batchneigh.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_batchneigh.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_batchneigh.cpython-39.pyc.139638198739712
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_batchneigh.cpython-39.pyc.140229762560768
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_batchneigh.cpython-39.pyc.140330556580464
+Binary files __pycache__/get_info_of_rank.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/get_info_of_rank.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_info_of_rank.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_info_of_rank.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_loss.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_loss.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_loss.cpython-39.pyc
+Binary files __pycache__/get_neighbour.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/get_neighbour.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_neighbour.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: get_neighbour.cpython-39.pyc
+Binary files __pycache__/gpu_sel.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/gpu_sel.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: gpu_sel.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: gpu_sel.cpython-39.pyc
+Only in __pycache__: Loss.cpython-310.pyc
+Binary files __pycache__/MODEL.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/MODEL.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: MODEL.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: MODEL.cpython-39.pyc
+Binary files __pycache__/optimize.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/optimize.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: optimize.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: optimize.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: print_info.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: print_info.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: print_info.cpython-39.pyc
+Only in __pycache__: Property_CHA.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_DM.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_DM.cpython-39.pyc
+Only in __pycache__: Property_ee.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F_DM.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F_DM.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_E_F_DM.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_Pol.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_Pol.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: Property_Pol.cpython-39.pyc
+Only in __pycache__: Property_qeq.cpython-310.pyc
+Binary files __pycache__/read.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/read.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: read.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: read.cpython-39.pyc
+Binary files __pycache__/read_data.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/read_data.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: read_data.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: read_data.cpython-39.pyc
+Binary files __pycache__/restart.cpython-310.pyc and /home/shaxh/FIREANN-main/src/__pycache__/restart.cpython-310.pyc differ
+Only in /home/shaxh/FIREANN-main/src/__pycache__: restart.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: restart.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: save_pes.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: save_pes.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: save_pes.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: save_scheduler.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: scheduler.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: scheduler.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: scheduler.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: script_PES.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: script_PES.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: script_PES.cpython-39.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: weight_scheduler.cpython-310.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: weight_scheduler.cpython-37.pyc
+Only in /home/shaxh/FIREANN-main/src/__pycache__: weight_scheduler.cpython-39.pyc
+2a3
+> import re
+5c6,11
+< def Read_data(folderlist,nprob,start_table=None):
+---
+> def Read_data(folderlist,Prop_list,start_table=None):
+>     # to generate the regular expression for various properties
+>     pattern=[]
+>     for prop in Prop_list:
+>         if prop!="Force":
+>             pattern.append(re.compile(r"(?<={}=)\'(.+?)\'".format(prop)))
+10,12d15
+<     bgcoor=None
+<     bgcharge=None
+<     bgcharge_real=None
+16a20
+>     ef=[]
+21,25d24
+<     if start_table==7:
+<        bgcoor=[]
+<        bgcharge=[]
+<        bgcharge_real=[]
+<        force=[]
+27c26,27
+<     num=0
+---
+>     num=0 
+>     abprop=[[] for m in Prop_list if m !="Force"]
+50,53c50,55
+<                 if start_table==7: 
+<                     bgcoor.append([])
+<                     bgcharge.append([])
+<                     bgcharge_real.append([])
+---
+>                 string=f1.readline()
+>                 for i,ipattern in enumerate(pattern):
+>                     tmp=re.findall(ipattern,string)
+>                     abprop[i].append(list(map(float,tmp[0].split())))
+> 
+>                 if start_table==1: force.append([])
+57,73c59,62
+<                     if m[0]=="background:":
+<                         abprop.append([])
+<                         while True:
+<                             string=f1.readline()
+<                             m=string.split()
+<                             if m[0]=="abprop:":
+<                                 break
+<                             tmp=list(map(float,m[:]))
+<                             bgcoor[num].append(tmp[0:3])
+<                             bgcharge[num].append(tmp[3])
+<                             abprop[num].append(tmp[4])
+<                             bgcharge_real[num].append(tmp[5])
+<                     if m[0]=="abprop:":
+<                          force.append(float(m[1]))
+<                          break
+< 
+<                     if start_table==1:
+---
+>                     if m[0]=="External_field:":
+>                         ef.append(list(map(float,m[1:])))
+>                         break
+>                     if not start_table:
+78d66
+<                         force[num].append(tmp[4:7])
+83a72
+>                         force[num].append(tmp[4:7])
+87c76
+<     return numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,abprop,force,bgcoor,bgcharge,bgcharge_real
+---
+>     return numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,ef,abprop,force
+2a3
+> import time
+9a11,12
+> from torch.nn.parallel import DistributedDataParallel as DDP
+> 
+12c15,18
+< fout.write("REANN Package used for fitting energy and tensorial Property\n")
+---
+> # save the dimension of each prop
+> Prop_dict={"Energy":1,"Dipole":3,"POL":9}
+> # the whole list of properties
+> Prop_full_list=["Energy",["Dipole","Force"],"POL"]
+15c21,22
+< start_table=0                  # 0 for energy 1 for force 2 for dipole 3 for transition dipole moment 4 for polarizability 5 for charge
+---
+> Prop_list_init={"Energy":0.1,"Dipole":0.1,"Force":50,"POL":0.1}
+> Prop_list_final={"Energy":0.1,"Dipole":0.1,"Force":0.5,"POL":0.1}
+18c25
+< nblock = 1                     # nblock>=2  resduial NN block will be employed nblock=1: simple feedforward nn
+---
+> nblock = 1                     # the number of resduial NN blocks
+21c28
+< Epoch=10000                  # total numbers of epochs for fitting 
+---
+> Epoch=50000                  # total numbers of epochs for fitting 
+24c31
+< print_epoch=1                 # number of epoch to calculate and print the error
+---
+> print_epoch=10                 # number of epoch to calculate and print the error
+26,27c33,34
+< start_lr=0.001                  # initial learning rate
+< end_lr=1e-5                    # final learning rate
+---
+> start_lr=0.01                  # initial learning rate
+> end_lr=1e-4                    # final learning rate
+32,35c39
+< batchsize_val=256                  # batch size 
+< e_ceff=0.1                    # weight of energy
+< init_f = 10                 # initial force weight in loss function
+< final_f = 5e-1                # final force weight in loss function
+---
+> batchsize_val=512                  # batch size 
+40c44
+< table_norm= True
+---
+> table_norm = False
+43,44c47,48
+< oc_loop = 1
+< oc_nl = [128,128]          # neural network architecture   
+---
+> oc_loop = 0
+> oc_nl = [32,32]          # neural network architecture   
+46c50
+< oc_dropout_p=[0.0,0.0]
+---
+> oc_dropout_p=[0.0,0.0,0.0,0.0]
+50c54
+< oc_table_norm=True
+---
+> oc_table_norm=False
+54a59
+> singma=3               # init singma for GTO
+56,62c61,64
+< #===================== defalut values in input_density============================================
+< nipsin=2
+< cutoff=5.0
+< nwave=8
+< totcharge=0.0
+< isFreezeDensity=False
+< ckptPath=None
+---
+> #=====================ema==================
+> ema_decay=0.99
+> ema_nbatch=32
+> #=========================================
+66a69,70
+> 
+> # select gpu
+87a92,94
+> # define the number of the neuron of output layer
+> outputneuron=1
+> 
+91a99,102
+> # defalut values in input_density
+> nipsin=2
+> cutoff=4.0
+> nwave=6
+93,102c104,114
+<    while True:
+<       tmp=f1.readline()
+<       if not tmp: break
+<       string=tmp.strip()
+<       if len(string)!=0:
+<           if string[0]=='#':
+<              pass
+<           else:
+<              m=string.split('#')
+<              exec(m[0])
+---
+>     while True:
+>         tmp=f1.readline()
+>         if not tmp: break
+>         string=tmp.strip()
+>         if len(string)!=0:
+>             if string[0]=='#':
+>                pass
+>             else:
+>                m=string.split('#')
+>                exec(m[0])
+> 
+106,118d117
+< #================ end of read parameter from input file================================
+< 
+< # define the outputneuron of NN
+< if start_table<=2:
+<    outputneuron=1
+< elif start_table==3:
+<    outputneuron=3
+< elif start_table==4:
+<    outputneuron=1
+< elif start_table==5 or start_table==6 or start_table==7:
+<    outputneuron=1
+< 
+< maxnumtype=len(atomtype)
+119a119
+> maxnumtype=len(atomtype)
+121,123c121,123
+<    rs=torch.from_numpy(np.array(rs,dtype=np_dtype))
+<    inta=torch.from_numpy(np.array(inta,dtype=np_dtype))
+<    nwave=rs.shape[1]
+---
+>     rs=torch.from_numpy(np.array(rs,dtype=np_dtype))
+>     inta=torch.from_numpy(np.array(inta,dtype=np_dtype))
+>     nwave=rs.shape[1]
+125,126c125,127
+<    inta=-(torch.rand(maxnumtype,nwave)+0.2)
+<    rs=torch.rand(maxnumtype,nwave)*cutoff
+---
+>     rs=torch.rand(maxnumtype,nwave)*cutoff
+>     inta=-torch.ones_like(rs)/(singma*singma)
+> 
+132,151d132
+< #========================use for read J/σ or generate J/σ=====================
+< if 'hardness' in locals().keys():
+<    hardness=torch.from_numpy(np.array(hardness,dtype=np_dtype))
+<    gausswidth=torch.from_numpy(np.array(gausswidth,dtype=np_dtype))
+< else:
+<    hardness=torch.rand(maxnumtype)*30
+<    gausswidth=torch.rand(maxnumtype)*10
+< 
+< #=====================use for read dceff or generate dceff====================
+< if 'dceff' in locals().keys():
+<    dceff=torch.from_numpy(np.array(maxnumtype,dceff,dtype=np_dtype))
+< else:
+<    dceff=torch.rand(maxnumtype,nwave)
+< 
+< if 'polarizability' in locals().keys():
+<    polarizability=torch.from_numpy(np.array(polarizability,dtype=np_dtype))
+<    slatR=torch.from_numpy(np.array(slatR,dtype=np_dtype))
+< else:
+<    polarizability=torch.rand(maxnumtype)
+<    slatR=torch.rand(maxnumtype)
+154c135
+< folder_val=folder+"test/"
+---
+> folder_val=folder+"validation/"
+158,175c139,163
+< if start_table==0 or start_table==1:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,pot,force,bgcoor,bgcharge=  \
+<     Read_data(folderlist,1,start_table=start_table)
+< elif start_table==2 or start_table==3:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,dip,force,bgcoor,bgcharge=  \
+<     Read_data(folderlist,3)
+< elif start_table==4:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,pol,force,bgcoor,bgcharge=  \
+<     Read_data(folderlist,9)
+< elif start_table==5:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,cha,force,bgcoor,bgcharge=  \
+<     Read_data(folderlist,sysatomnum)
+< elif start_table==6:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,qeq,force,bgcoor,bgcharge=  \
+<     Read_data(folderlist,sysatomnum)
+< elif start_table==7:
+<     numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,qeq,force,bgcoor,bgcharge,bgcharge_real=  \
+<     Read_data(folderlist,sysatomnum,start_table=start_table)
+---
+> # to oredr the Prop_list and the corresponding weight
+> Prop_list=[]
+> init_weight=[]
+> final_weight=[]
+> for key in Prop_list_init.keys():
+>     Prop_list.append(key)
+>     init_weight.append(Prop_list_init[key])
+>     final_weight.append(Prop_list_final[key])
+> 
+> start_table=None
+> if "Force" in Prop_list_init.keys(): start_table=1
+> 
+> numpoint,atom,mass,numatoms,scalmatrix,period_table,coor,ef,abprop,force=Read_data(folderlist,Prop_list,start_table=start_table)
+> 
+> # to validate the number of properties equal to the number of read from datafile and set the corresponding weight
+> nprop=0
+> #Prop_list.remove("Force")
+> for m in Prop_list:
+>     if m != "Force": nprop+=Prop_dict[m]
+> 
+> nprop1=0
+> for i in range(len(abprop)):
+>     nprop1+=len(abprop[i][0])
+> if nprop!=nprop1:
+>     raise RuntimeError("The length of Property is not consistent with the dimension of properties defined in 'input_nn'. Please check the input or configuration file")
+181c169,172
+< # 以数据集能量的平均值作为标准，计算各个能量值相对于平均值的偏移量
+---
+> # here to convert the abprop to torch tensor
+> for i,iprop in enumerate(abprop):
+>     abprop[i]=np.array(iprop)
+>     
+183,186c174,176
+< if start_table<=1:
+<     pot=np.array(pot,dtype=np.float64).reshape(-1)
+<     initpot=np.sum(pot)/np.sum(numatoms)
+<     pot=pot-initpot*numatoms
+---
+> if "Energy" in Prop_list:
+>     initpot=np.sum(abprop[0][:])/np.sum(numatoms)
+>     abprop[0]=abprop[0]-initpot*numatoms.reshape(-1,1)
+197,211c187
+< ntrain_vec=0
+< for ipoint in range(numpoint[0]):
+<     ntrain_vec+=numatoms[ipoint]*3
+< 
+< nval_vec=0
+< for ipoint in range(numpoint[0],ntotpoint):
+<     nval_vec+=numatoms[ipoint]*3
+< 
+< 
+< # parallel process the variable
+< # 涉及调度，此段暂时跳过
+< #=====================environment for select the GPU in free=================================================
+< local_rank = int(os.environ.get("LOCAL_RANK"))
+< local_size = int(os.environ.get("LOCAL_WORLD_SIZE"))
+< 
+---
+> # parallel process the variable  
+213d188
+< world_size = int(os.environ.get("WORLD_SIZE"))
+215,217c190,191
+< DDP_backend="gloo"
+< if torch.cuda.is_available():
+<     DDP_backend="nccl"
+---
+> #a=torch.empty(10000,device=device)  # used for apply some memory to prevent two process on the smae gpu
+> world_size = int(os.environ.get("WORLD_SIZE"))
+219c193
+< #a=torch.empty(100000,device=device)  # used for apply some memory to prevent two process on the same gpu
+---
+> 
+229,230c203,204
+<     raise RuntimeError("The size of training or val dataset are smaller than the number of processes, please decrease the number of processes.")
+< # divide the work on each rank
+---
+>     raise RuntimeError("The size of training or validation dataset are smaller than the number of processes, please decrease the number of processes.")
+> # devide the work on each rank
+236,237c210,211
+< com_coor_train,force_train,bgcor_train,bgcha_train,bgcha_real_train,numatoms_train,species_train,atom_index_train,shifts_train=\
+< get_info_of_rank(range_train,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,bgcoor,bgcharge,bgcharge_real,\
+---
+> com_coor_train,force_train,numatoms_train,species_train,atom_index_train,shifts_train=\
+> get_info_of_rank(range_train,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,\
+240c214
+< # get the shifts and atom_index of each neighbor for val
+---
+> # get the shifts and atom_index of each neighbor for validation
+244,245c218,219
+< com_coor_val,force_val,bgcor_val,bgcha_val,bgcha_real_val,numatoms_val,species_val,atom_index_val,shifts_val=\
+< get_info_of_rank(range_val,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,bgcoor,bgcharge,bgcharge_real,\
+---
+> com_coor_val,force_val,numatoms_val,species_val,atom_index_val,shifts_val=\
+> get_info_of_rank(range_val,atom,atomtype,mass,numatoms,scalmatrix,period_table,coor,force,\
+248,329c222,242
+< # nprop is the number of properties used for training in the same NN  if start_table==1: nprop=2 else nprop=1
+< nprop=1
+< if start_table==1: 
+<     pot_train=torch.from_numpy(np.array(pot[range_train[0]:range_train[1]],dtype=np_dtype))
+<     pot_val=torch.from_numpy(np.array(pot[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train=(pot_train,force_train)
+<     abpropset_val=(pot_val,force_val)
+<     nprop=2
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0]=numpoint[0]
+<     train_nele[1]=ntrain_vec
+<     val_nele[0]=numpoint[1] 
+<     val_nele[1]=nval_vec
+<    
+< if start_table==0: 
+<     pot_train=torch.from_numpy(np.array(pot[range_train[0]:range_train[1]],dtype=np_dtype))
+<     pot_val=torch.from_numpy(np.array(pot[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train=(pot_train,)
+<     abpropset_val=(pot_val,)
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0]=numpoint[0] 
+<     val_nele[0]=numpoint[1] 
+< 
+< if start_table==2 or start_table==3: 
+<     dip_train=torch.from_numpy(np.array(dip[range_train[0]:range_train[1]],dtype=np_dtype))
+<     dip_val=torch.from_numpy(np.array(dip[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train=(dip_train,)
+<     abpropset_val=(dip_val,)
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0]=numpoint[0]*3
+<     val_nele[0]=numpoint[1]*3
+< 
+< if start_table==4: 
+<     pol_train=torch.from_numpy(np.array(pol[range_train[0]:range_train[1]],dtype=np_dtype))
+<     pol_val=torch.from_numpy(np.array(pol[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train=(pol_train,)
+<     abpropset_val=(pol_val,)
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0]=numpoint[0]*9
+<     val_nele[0]=numpoint[1]*9 
+< 
+< if start_table==5:
+<     cha_train=torch.from_numpy(np.array(cha[range_train[0]:range_train[1]],dtype=np_dtype))
+<     cha_val=torch.from_numpy(np.array(cha[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train=(cha_train,)
+<     abpropset_val=(cha_val,)
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0]=numpoint[0]*sysatomnum 
+<     val_nele[0]=numpoint[1]*sysatomnum 
+< 
+< if start_table == 7:
+<     nprop = 2
+<     def pad_sequences(sequences, max_len=None, dtype=np_dtype):
+<         if max_len is None:
+<             max_len = max(len(seq) for seq in sequences)
+<         padded = np.zeros((len(sequences), max_len), dtype=dtype)
+<         for i, seq in enumerate(sequences):
+<             padded[i, :len(seq)] = seq[:max_len]
+<         return padded,max_len
+<     qeq_subset_train = qeq[range_train[0]:range_train[1]]
+<     qeq_padded_train,max_len1 = pad_sequences(qeq_subset_train)
+<     qeq_train = torch.from_numpy(qeq_padded_train)
+<     qeq_subset_val = qeq[range_val[0]:range_val[1]]
+<     qeq_padded_val,max_len2 = pad_sequences(qeq_subset_val)
+<     qeq_val = torch.from_numpy(qeq_padded_val)
+<     force_train = torch.from_numpy(np.array(force[range_train[0]:range_train[1]],dtype=np_dtype))
+<     force_val = torch.from_numpy(np.array(force[range_val[0]:range_val[1]],dtype=np_dtype))
+<     abpropset_train = (qeq_train,force_train)
+<     abpropset_val = (qeq_val,force_val)
+<     val_nele=torch.empty(nprop)
+<     train_nele=torch.empty(nprop)
+<     train_nele[0] = numpoint[0] * max_len1
+<     val_nele[0] = numpoint[1] * max_len2
+<     train_nele[1]=numpoint[0]
+<     val_nele[1]=numpoint[1] 
+<     
+< 
+---
+> abprop_train=()
+> abprop_val=()
+> train_nele=[]
+> val_nele=[]
+> tmp_f=0
+> for i,iprop in enumerate(Prop_list):
+>     if iprop == "Force":
+>         abprop_train+=(force_train,)
+>         abprop_val+=(force_val,)
+>         train_nele.append(np.sum(numatoms[0:numpoint[0]])*3)
+>         val_nele.append(np.sum(numatoms[numpoint[0]:ntotpoint])*3)
+>         tmp_f=1
+>     else:
+>         abprop_train+=(torch.from_numpy(abprop[i-tmp_f][range_train[0]:range_train[1]]).to(torch_dtype),)
+>         abprop_val+=(torch.from_numpy(abprop[i-tmp_f][range_val[0]:range_val[1]]).to(torch_dtype),)
+>         train_nele.append(numpoint[0]*Prop_dict[Prop_list[i]])
+>         val_nele.append(numpoint[1]*Prop_dict[Prop_list[i]])
+> ef_train=torch.from_numpy(np.array(ef[range_train[0]:range_train[1]],dtype=np_dtype))
+> ef_val=torch.from_numpy(np.array(ef[range_val[0]:range_val[1]],dtype=np_dtype))
+> train_nele=torch.from_numpy(np.array(train_nele)).to(device)
+> val_nele=torch.from_numpy(np.array(val_nele)).to(device)
+332,337c245,246
+< if start_table==0: del pot
+< if start_table==1: del pot,force
+< if start_table==2 and start_table==3: del dip
+< if start_table==4: del pol
+< if start_table==5: del cha
+< if start_table==6 or start_table==7: del qeq,force
+---
+> if start_table==0: del abprop
+> if start_table==1: del abprop,force,ef
+341,344d249
+< # random list of index
+< prop_ceff=torch.ones(2,device=device)
+< prop_ceff[0]=e_ceff
+< prop_ceff[1]=init_f
+345a251,252
+> init_weight=torch.from_numpy(np.array(init_weight,dtype=np_dtype)).to(device)
+> final_weight=torch.from_numpy(np.array(final_weight,dtype=np_dtype)).to(device)
+349a257,283
+> #==========================================================
+> if dist.get_rank()==0:
+>     fout.write("REANN Package used for fitting energy and tensorial Property\n")
+>     fout.write(time.strftime("%Y-%m-%d-%H_%M_%S \n", time.localtime()))
+>     fout.flush()
+> 
+> # used for obtaining the index of each property in Property calculation 
+> # the architecture is scalar, first derivate, sencond derivate
+> # only incorporate the property with reference into the loss function
+> num=0
+> index_prop=[]
+> for iprop in Prop_full_list:
+>     if isinstance(iprop,str):
+>         for i in Prop_list:
+>            if i==iprop: 
+>               index_prop.append(num)
+>     else:
+>         num-=1
+>         for iiprop in iprop:
+>             for i in Prop_list:
+>                 if i==iiprop:
+>                     num+=1
+>                     index_prop.append(num)
+>     num+=1
+> # only fitting the polarizability
+> if "POL" in Prop_list and len(Prop_list)==1:
+>     index_prop=[0]

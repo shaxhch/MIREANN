@@ -55,7 +55,7 @@ data_train,data_test,Prop_class,loss_fn,optim,scheduler,ema,restart,PES_Normal,d
               lr=optim.param_groups[0]["lr"]
               fout.write("{:5} {:4} {:15} {:5e}  {} ".format("Epoch=",iepoch,"learning rate",lr,"train error:"))
               for error in lossprop:
-                  fout.write('{:10.5f} '.format(error))
+                  fout.write('{:15.9f} '.format(error))
           
           # calculate the test error
           lossprop=torch.zeros(nprop,device=device)

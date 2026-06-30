@@ -81,7 +81,8 @@ class GetDensity(torch.nn.Module):
         numatom=cart.shape[0]
         bg_field = self.calculate_bg_field(cart,bgcart,bgcha)
         angular_output = self.angular(bg_field,torch.ones(bg_field.shape[0],dtype=bg_field.dtype,device=bg_field.device))
-        bg_orbital = torch.einsum("ji,k->ijk",angular_output,self.dceff).contiguous()
+        dceff_per_atom = self.dceff.index_select(0, species)
+        bg_orbital = torch.einsum("ji,ik->jik", angular_output, dceff_per_atom).permute(1, 0, 2).contiguous()
         neigh_species=species.index_select(0,neigh_list[1])
         selected_cart = cart.index_select(0, neigh_list.view(-1)).view(2, -1, 3)
         dist_vec = selected_cart[0] - selected_cart[1]-shifts

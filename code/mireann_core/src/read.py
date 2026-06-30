@@ -139,9 +139,9 @@ else:
 
 #=====================use for read dceff or generate dceff====================
 if 'dceff' in locals().keys():
-   dceff=torch.from_numpy(np.array(dceff,dtype=np_dtype))
+   dceff=torch.from_numpy(np.array(maxnumtype,dceff,dtype=np_dtype))
 else:
-   dceff=torch.rand(nwave)
+   dceff=torch.rand(maxnumtype,nwave)
 
 if 'polarizability' in locals().keys():
    polarizability=torch.from_numpy(np.array(polarizability,dtype=np_dtype))
