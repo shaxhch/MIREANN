@@ -58,9 +58,6 @@ elif start_table==7:
     import ee.script_PES as PES_Normal
 fout.write(time.strftime("%Y-%m-%d-%H_%M_%S \n", time.localtime()))
 #==============================train data loader===================================
-# 对数据的加载，包括
-# com_coor:坐标 abpropset:ab物理量 numatoms:原子数量 species:原子种类
-# shifts:      batchsize:     min_data_len:  shuffle:对从0到n-1随机打乱后所得的数字序列
 dataloader_train=DataLoader(com_coor_train,bgcor_train,bgcha_train,bgcha_real_train,abpropset_train,numatoms_train,\
 species_train,atom_index_train,shifts_train,batchsize_train,min_data_len=min_data_len_train,shuffle=True)
 #=================================validation data loader=================================
@@ -75,16 +72,13 @@ else:
     data_val=dataloader_val
 #==============================oc nn module=================================
 # outputneuron=nwave for each orbital have a different coefficients
-# oc_前缀的参数代表构建NN modules
 ocmod_list=[]
 for ioc_loop in range(oc_loop):
     ocmod=NNMod(maxnumtype,nwave,atomtype,oc_nblock,list(oc_nl),oc_dropout_p,oc_actfun,table_norm=oc_table_norm)
     ocmod_list.append(ocmod)
 #=======================density======================================================
-# eann/reann神经网络的核心
 getdensity=GetDensity(rs,inta,dceff,cutoff,neigh_atoms,nipsin,norbit,ocmod_list)
 #==============================nn module=================================
-#nnmod为神经网络模型，
 nnmod=NNMod(maxnumtype,outputneuron,atomtype,nblock,list(nl),dropout_p,actfun,initpot=initpot,table_norm=table_norm)
 nnmodlist=[nnmod]
 
@@ -94,7 +88,6 @@ if start_table == 4:
     nnmodlist.append(nnmod1)
     nnmodlist.append(nnmod2)
 #=========================create the module=========================================
-#算出原子电子密度,对于永久偶极矩需要三个输出神经元
 if start_table <= 5:
     Prop_class=Property(getdensity,nnmodlist).to(device).to(torch_dtype)  # to device must be included
 elif start_table == 6:
@@ -121,7 +114,6 @@ scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(optim,factor=decay_factor,p
 restart=Restart(optim)
 
 # load the model from EANN.pth
-# EANN.pth为模型重载文件
 if table_init==1:
     restart(Prop_class,"REANN.pth")
     nnmod.initpot[0]=initpot
