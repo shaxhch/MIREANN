@@ -178,7 +178,6 @@ elif start_table==7:
 numpoint=np.array(numpoint,dtype=np.int64)
 numatoms=np.array(numatoms,dtype=np.int64)
 # here the double is used to scal the potential with a high accuracy
-# 以数据集能量的平均值作为标准，计算各个能量值相对于平均值的偏移量
 initpot=0.0
 if start_table<=1:
     pot=np.array(pot,dtype=np.float64).reshape(-1)
@@ -204,7 +203,6 @@ for ipoint in range(numpoint[0],ntotpoint):
 
 
 # parallel process the variable
-# 涉及调度，此段暂时跳过
 #=====================environment for select the GPU in free=================================================
 local_rank = int(os.environ.get("LOCAL_RANK"))
 local_size = int(os.environ.get("LOCAL_WORLD_SIZE"))
