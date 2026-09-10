@@ -6,7 +6,6 @@ import torch
 from queue import Queue
 
 class CudaDataLoader:
-    """ 异步预先将数据从CPU加载到GPU中 """
 
     def __init__(self, loader, device, queue_size=0):
         self.device = device
@@ -20,7 +19,6 @@ class CudaDataLoader:
         self.length=self.loader.length
 
     def load_loop(self):
-        """ 不断的将cuda数据加载到队列里 """
         # The loop that will load into the queue in the background
         while True:
             with torch.cuda.stream(self.load_stream):
@@ -28,7 +26,6 @@ class CudaDataLoader:
                     self.queue.put(self.load_instance(sample))
 
     def load_instance(self, sample):
-        """ 将batch数据从CPU加载到GPU中 """
         if torch.is_tensor(sample):
             return sample.to(self.device, non_blocking=True)
         else:
@@ -39,17 +36,14 @@ class CudaDataLoader:
         return self
 
     def __next__(self):
-        # 加载线程挂了
         if not self.worker.is_alive() and self.queue.empty():
             self.idx = 0
             self.queue.join()
             self.worker.join()
             raise StopIteration
-        # 一个epoch加载完了
         elif self.idx >= self.length:
             self.idx = 0
             raise StopIteration
-        # 下一个batch
         else:
             out = self.queue.get()
             self.queue.task_done()
