@@ -46,7 +46,6 @@ class Property(torch.nn.Module):
         distances: tensor[nbatch,numatoms,numatoms] distance vector between atom i and j
         gamma: tensor[nbatch,numatoms,numaotms] √(σi^2+σj^2)
         '''
-        # torch.linalg.norm 函数用于计算张量的范数（norm）。范数是一个将向量映射到非负值的函数，表示向量的大小。 
         species_=species.view(-1)
         density = self.density(cart,numatoms,species_,atom_index,shifts)
         electronegativities=self.nnmod(density,species_).view(numatoms.shape[0],-1)
