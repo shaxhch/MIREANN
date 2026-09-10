@@ -10,7 +10,6 @@ def get_batch_neigh(com_coor,scalmatrix,species,period,neigh_atoms,batchsize,cut
     atom_index=torch.empty((2,ntotpoint,maxnumatom*neigh_atoms),dtype=torch.long)
     tmpbatch=1
     maxneigh=0
-    #如果scalmatrix,species,period相同，并且未达到batchsize上限，则将它们划到同一个batch中
     for ipoint in range(1,ntotpoint+1):
         if ipoint<ntotpoint and (scalmatrix[ipoint-1]==scalmatrix[ipoint]).all() and \
         (species[ipoint-1]==species[ipoint]).all() and (period[ipoint-1]==period[ipoint]).all \
